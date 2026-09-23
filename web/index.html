@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSO 3D Localization Simulator — Efficient Localization in WSN (3D)</title>
+<meta name="description" content="Interactive particle-swarm 3D node localization for wireless sensor networks: change anchors, noise, swarm size and watch the swarm converge.">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>PSO 3D Localization Simulator</h1>
+    <p class="sub">Efficient Localization in Wireless Sensor Networks (3D) — capstone, GITAM Visakhapatnam.
+      Range-based position estimation: minimise f(p) = Σ<sub>j</sub> (‖p − a<sub>j</sub>‖ − d̂<sub>j</sub>)² with a particle swarm.</p>
+  </div>
+  <a class="btn ghost" href="https://github.com/D-L-Narayana/CAPSTONE" target="_blank" rel="noopener">GitHub repo</a>
+</header>
+
+<main>
+  <aside class="panel">
+    <h2>Scenario</h2>
+    <div class="row3">
+      <label>Field X (m)<input id="fx" type="number" value="60" min="5" step="1"></label>
+      <label>Field Y (m)<input id="fy" type="number" value="60" min="5" step="1"></label>
+      <label>Field Z (m)<input id="fz" type="number" value="20" min="1" step="1"></label>
+    </div>
+    <h3>Anchors a<sub>j</sub> and ranging noise n<sub>j</sub> (m)</h3>
+    <table id="anchors" class="anchors">
+      <thead><tr><th>#</th><th>x</th><th>y</th><th>z</th><th>n<sub>j</sub></th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row2">
+      <button id="addAnchor" class="btn small">+ anchor</button>
+      <label class="inline"><input id="gauss" type="checkbox"> Gaussian noise σ <input id="sigma" type="number" value="0.5" step="0.1" min="0" style="width:4.5em"></label>
+    </div>
+    <h3>True node p</h3>
+    <div class="row3">
+      <label>x<input id="px" type="number" value="37" step="0.1"></label>
+      <label>y<input id="py" type="number" value="12" step="0.1"></label>
+      <label>z<input id="pz" type="number" value="8.5" step="0.1"></label>
+    </div>
+    <button id="randomNode" class="btn small">random node</button>
+
+    <h2>Swarm</h2>
+    <div class="row2">
+      <label>Variant
+        <select id="variant">
+          <option value="simplified">Simplified PSO (best of iteration)</option>
+          <option value="standard">Standard PSO (pbest / gbest)</option>
+        </select>
+      </label>
+      <label>Seed<input id="seed" type="number" value="1" step="1"></label>
+    </div>
+    <div class="row3">
+      <label>Particles N<input id="np" type="number" value="20" min="2" max="500" step="1"></label>
+      <label>Iterations T<input id="nt" type="number" value="60" min="1" max="1000" step="1"></label>
+      <label>Speed (ms/it)<input id="speed" type="number" value="120" min="0" step="10"></label>
+    </div>
+    <div class="row3">
+      <label>Inertia w<input id="w" type="number" value="0.7" step="0.05"></label>
+      <label>c2 social<input id="c" type="number" value="1.4" step="0.1"></label>
+      <label>c1 cognitive (std.)<input id="c1" type="number" value="1.4" step="0.1"></label>
+    </div>
+    <label class="inline"><input id="clip" type="checkbox"> clip particles to the field</label>
+    <div class="controls">
+      <button id="reset" class="btn">Reset</button>
+      <button id="step" class="btn">Step</button>
+      <button id="play" class="btn primary">Play</button>
+      <button id="finish" class="btn">Run to end</button>
+    </div>
+    <p class="note">Random numbers come from a seeded JavaScript generator (mulberry32), so a run here is repeatable
+      but does not reproduce the NumPy <code>default_rng(1)</code> numbers of the Python baseline bit-for-bit.</p>
+  </aside>
+
+  <section class="viz">
+    <div id="plot3d" class="plot"></div>
+    <div class="stats" id="stats"></div>
+    <div id="plotConv" class="plot small"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Team: D L Narayana (lead), K. Chiranjeevi Ashutosh, S. N. S. Vijay Vagdeesh, P. Yaswanth · Guide: Dr. Pujasuman Tripathy · PROJ2999, GITAM School of CSE, Visakhapatnam.
+  Base paper: Alhasan et al., 2023, <a href="https://doi.org/10.1016/j.jksuci.2023.101782" target="_blank" rel="noopener">doi:10.1016/j.jksuci.2023.101782</a>.</p>
+</footer>
+<script src="pso.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
