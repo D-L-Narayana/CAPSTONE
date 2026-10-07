@@ -1,0 +1,27 @@
+# Contents of the source distribution (pso3d-<version>.tar.gz). The wheel is governed by
+# [tool.setuptools.packages.find] in pyproject.toml and contains only the pso3d package.
+#
+# The source archive must be self-sufficient: the complete test suite (Python + Node) and every documented
+# checkout command (`python -m pso3d baseline|experiments|network`, scripts/check.sh) run from the extracted
+# archive. scripts/check_sdist.py and tests/test_sdist.py verify this.
+include LICENSE README.md pyproject.toml MANIFEST.in
+include CONTRIBUTING.md CHANGELOG.md requirements.txt
+graft pso3d
+graft tests
+graft scripts
+graft web
+graft docs
+graft results
+graft .github
+
+# Never shipped: build output, caches, git metadata, byte-code, logs, the generated figures (binaries that the
+# CLI regenerates) and the reference papers / personal documents kept at the repository root.
+prune build
+prune dist
+prune figures
+prune node_modules
+prune .git
+prune .pytest_cache
+prune .ruff_cache
+prune .mypy_cache
+global-exclude __pycache__ *.py[cod] *.pdf *.docx *.log .DS_Store

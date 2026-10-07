@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (python ${{ matrix.python-version }}, node 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      MPLBACKEND: Agg
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # the dev extra also puts setuptools>=77 into the runtime environment: scripts/check_sdist.py and
+      # tests/test_sdist.py build the archives with setuptools.build_meta in this interpreter
+      - name: Install the package with the plotting and test extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[plots,dev]"
+
+      - name: Show versions
+        run: |
+          python --version
+          node --version
+          python -c "import pso3d, numpy, matplotlib; print('pso3d', pso3d.__version__, 'numpy', numpy.__version__, 'matplotlib', matplotlib.__version__)"
+
+      # compileall, node --check web/*.js, pytest (tests/e2e excluded), node --test tests/js/, source-archive check.
+      # The browser gate tests/e2e/web_smoke.js is not run here: it needs Playwright and a Chromium
+      # download (see CONTRIBUTING.md, "Browser gate").
+      - name: Run repository checks
+        run: bash scripts/check.sh
+
+      # Rebuilds the sdist and the wheel from a clean copy of the checkout, verifies their contents and runs the
+      # complete unmodified suite from the extracted source archive (also step 5/5 of check.sh; run again here so
+      # the report and the artefacts of this exact interpreter are attached to the workflow run).
+      - name: Source-archive check (sdist + wheel)
+        run: python scripts/check_sdist.py --out build/sdist-check
+
+      - name: Upload source-archive report and artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist-check-py${{ matrix.python-version }}
+          path: build/sdist-check
+          if-no-files-found: ignore

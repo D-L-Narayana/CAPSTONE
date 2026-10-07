@@ -61,7 +61,7 @@
     "distance_computations": 4800,
     "swarm_state_floats": 120,
     "swarm_state_bytes": 960,
-    "runtime_ms": 1.6728999999031657,
+    "runtime_ms": 5.459149950183928,
     "best_fitness": 0.056956442643457394,
     "plateau_iteration": 48,
     "best_history": [
@@ -134,7 +134,7 @@
       11.648976790180622
     ],
     "error_m": 3.2004577517965114,
-    "runtime_us": 5493.480000041018
+    "runtime_us": 366.71000998467207
   },
   "least_squares_gauss_newton": {
     "estimate": [
@@ -155,7 +155,7 @@
     "fitness_evaluations": 1220,
     "swarm_state_floats": 183
   },
-  "amcmpso_in_progress": {
+  "amcmpso_interpretation": {
     "estimate": [
       37.42111071861267,
       11.884235422221392,

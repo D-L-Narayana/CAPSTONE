@@ -1,0 +1,4 @@
+round,newly_settled,settled_total,refs_available_mean,evaluations,coverage_fraction
+1,1,1,1.320,1220,0.0200
+2,1,2,1.388,1220,0.0400
+3,0,2,1.417,0,0.0400

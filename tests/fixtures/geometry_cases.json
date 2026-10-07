@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "description": "Geometry diagnostics of the slide-16 baseline anchors at three probe points: GDOP, CRLB (sigma = 0.5 m), mirror point across the least-squares anchor plane, flip-ambiguity risk for the baseline measured ranges and the noise-only risk hint. Written by tests/test_geometry.py and compared on every run (tolerance 1e-9).",
+  "anchors": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      60.0,
+      0.0,
+      5.0
+    ],
+    [
+      0.0,
+      60.0,
+      6.0
+    ],
+    [
+      60.0,
+      60.0,
+      20.0
+    ]
+  ],
+  "true_position": [
+    37.0,
+    12.0,
+    8.5
+  ],
+  "noise": [
+    0.4,
+    -0.3,
+    0.5,
+    -0.4
+  ],
+  "measured": [
+    40.21519810323691,
+    25.877280225416847,
+    61.156821545478294,
+    54.05410911951457
+  ],
+  "sigma": 0.5,
+  "rank": 3,
+  "non_coplanar": true,
+  "tetrahedron_volume": 5400.000000000001,
+  "plane": {
+    "centroid": [
+      30.0,
+      30.0,
+      7.75
+    ],
+    "normal": [
+      -0.15488159142386265,
+      -0.17118491683690243,
+      0.9729889089221698
+    ]
+  },
+  "cases": [
+    {
+      "point": [
+        37.0,
+        12.0,
+        8.5
+      ],
+      "gdop": 5.292718244567838,
+      "crlb_rmse": 2.646359122283919,
+      "crlb_per_axis": [
+        0.43803373987336236,
+        0.5957375115833191,
+        2.540952550544851
+      ],
+      "mirror": [
+        37.84469292741821,
+        12.93360797240961,
+        3.193514947340013
+      ],
+      "flip_risk": 0.7355991242721082,
+      "flip_risk_hint": 0.7197533271931215
+    },
+    {
+      "point": [
+        30.0,
+        30.0,
+        10.0
+      ],
+      "gdop": 6.9632830895677,
+      "crlb_rmse": 3.48164154478385,
+      "crlb_per_axis": [
+        0.6415337097034501,
+        0.6874649261535875,
+        3.352261075899018
+      ],
+      "mirror": [
+        30.67814131793235,
+        30.749524614556815,
+        5.739816624015005
+      ],
+      "flip_risk": 1.0,
+      "flip_risk_hint": 0.8348912042848174
+    },
+    {
+      "point": [
+        5.0,
+        55.0,
+        2.0
+      ],
+      "gdop": 2.2943122836946936,
+      "crlb_rmse": 1.1471561418473468,
+      "crlb_per_axis": [
+        0.4169347365469611,
+        0.44840836661504574,
+        0.9700837984361108
+      ],
+      "mirror": [
+        3.140717938232581,
+        52.945004036993886,
+        13.680283034455709
+      ],
+      "flip_risk": 1.0,
+      "flip_risk_hint": 0.10860635235862187
+    }
+  ]
+}

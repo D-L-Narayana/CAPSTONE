@@ -12,6 +12,14 @@
 Random numbers come from ``numpy.random.default_rng(seed)`` in the same order
 as the original script ``p09_pso_localization_3d.py``: first the N x 3 uniform
 start positions, then one N x 3 uniform draw per iteration.
+
+Optional extensions (all OFF by default, none of them touches the random stream):
+
+* ``stopping`` - a rule from :mod:`pso3d.stopping` (``Patience``, ``Tolerance``,
+  ``MaxEvaluations``, ``TargetFitness`` or ``AnyOf``) consulted after every iteration;
+  ``early_stop_patience=p`` is kept as a deprecated alias for ``stopping=Patience(p)``.
+* ``x0`` - warm start: after the uniform initial draw particle 0 is replaced by
+  ``clip(x0, lower, upper)`` with zero velocity (e.g. the least-squares / Gauss-Newton estimate).
 """
 from __future__ import annotations
 
@@ -20,6 +28,17 @@ import time
 import numpy as np
 
 from .fitness import RangeErrorFitness
+from .stopping import Patience, StoppingRule
+
+
+def _validate_x0(x0) -> np.ndarray | None:
+    """Return x0 as a float array of shape (3,), or None."""
+    if x0 is None:
+        return None
+    arr = np.asarray(x0, dtype=float)
+    if arr.shape != (3,):
+        raise ValueError(f"x0 must be a single 3-D point of shape (3,), got shape {arr.shape}")
+    return arr
 
 
 @dataclass
@@ -35,6 +54,9 @@ class PSOResult:
     best_history: list[float] = field(default_factory=list)     # best fitness per iteration
     estimate_history: list[np.ndarray] = field(default_factory=list)
     positions_history: list[np.ndarray] | None = None           # (T+1, N, 3) if recorded
+    stopped_by: str | None = None                               # name of the stopping rule that fired
+    warm_start: bool = False                                    # particle 0 seeded from x0
+    method: str = ""                                            # "simplified" | "standard" | ...
 
     def error(self, true_position: np.ndarray) -> float:
         return float(np.linalg.norm(self.estimate - np.asarray(true_position)))
@@ -43,15 +65,20 @@ class PSOResult:
 class SimplifiedPSO:
     def __init__(self, n_particles: int = 20, n_iterations: int = 60, w: float = 0.7,
                  c: float = 1.4, seed: int | None = 1, clip: bool = False,
-                 early_stop_patience: int | None = None, record_positions: bool = False):
+                 early_stop_patience: int | None = None, record_positions: bool = False,
+                 stopping: StoppingRule | None = None, x0=None):
         self.n_particles = int(n_particles)
         self.n_iterations = int(n_iterations)
         self.w = float(w)
         self.c = float(c)
         self.seed = seed
         self.clip = clip
-        self.early_stop_patience = early_stop_patience
+        self.early_stop_patience = early_stop_patience      # deprecated alias, see below
         self.record_positions = record_positions
+        if stopping is None and early_stop_patience is not None:
+            stopping = Patience(early_stop_patience)
+        self.stopping = stopping
+        self.x0 = _validate_x0(x0)
 
     # memory model from slide 16: N particles x 3 coordinates x 2 (position, velocity)
     def swarm_state_floats(self) -> int:
@@ -63,15 +90,20 @@ class SimplifiedPSO:
         upper = np.asarray(upper, dtype=float)
         t0 = time.perf_counter()
         fitness.reset()
+        stopping = self.stopping
+        if stopping is not None:
+            stopping.reset()
 
         x = rng.uniform(lower, upper, (self.n_particles, 3))
+        if self.x0 is not None:                 # warm start: after the draw, no random numbers consumed
+            x[0] = np.clip(self.x0, lower, upper)
         v = np.zeros((self.n_particles, 3))
         best_x = x[0].copy()
-        best_f = np.inf
+        best_f = np.inf                         # best fitness seen so far (best-ever)
         best_hist: list[float] = []
         est_hist: list[np.ndarray] = []
         pos_hist = [x.copy()] if self.record_positions else None
-        stall = 0
+        stopped_by: str | None = None
         it_run = 0
 
         for it in range(self.n_iterations):
@@ -91,11 +123,10 @@ class SimplifiedPSO:
                 x = np.clip(x, lower, upper)
             if pos_hist is not None:
                 pos_hist.append(x.copy())
-            # optional early stopping on a plateau of the per-iteration best fitness
-            if self.early_stop_patience is not None:
-                stall = 0 if improved else stall + 1
-                if stall >= self.early_stop_patience:
-                    break
+            # optional early stopping (Patience reproduces the legacy plateau test on best_f)
+            if stopping is not None and stopping.update(it + 1, best_f, fitness.evaluations):
+                stopped_by = stopping.name
+                break
 
         runtime = time.perf_counter() - t0
         return PSOResult(
@@ -110,4 +141,7 @@ class SimplifiedPSO:
             best_history=best_hist,
             estimate_history=est_hist,
             positions_history=np.array(pos_hist) if pos_hist is not None else None,
+            stopped_by=stopped_by,
+            warm_start=self.x0 is not None,
+            method="simplified",
         )

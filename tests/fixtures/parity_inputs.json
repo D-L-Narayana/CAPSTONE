@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "description": "Shared Python/JavaScript parity inputs. Consumed by tests/test_parity.py (Python) and tests/js/dump.js (Node). Ranges are measured = ||p - a_j|| + noise_j; sigma is the Gaussian level used for CRLB bounds; probe_points are evaluated for fitness, GDOP, CRLB and mirror points.",
+  "cases": [
+    {
+      "id": "baseline",
+      "anchors": [[0.0, 0.0, 0.0], [60.0, 0.0, 5.0], [0.0, 60.0, 6.0], [60.0, 60.0, 20.0]],
+      "true_position": [37.0, 12.0, 8.5],
+      "noise": [0.4, -0.3, 0.5, -0.4],
+      "sigma": 0.5,
+      "field": [60.0, 60.0, 20.0],
+      "probe_points": [[37.0, 12.0, 8.5], [30.0, 30.0, 10.0], [5.0, 55.0, 2.0], [37.43, 11.9, 9.29]]
+    },
+    {
+      "id": "near_coplanar",
+      "anchors": [[0.0, 0.0, 0.0], [60.0, 0.0, 0.0], [0.0, 60.0, 0.0], [60.0, 60.0, 0.01]],
+      "true_position": [20.0, 40.0, 12.0],
+      "noise": [0.2, -0.1, 0.3, -0.2],
+      "sigma": 0.5,
+      "field": [60.0, 60.0, 20.0],
+      "probe_points": [[20.0, 40.0, 12.0], [30.0, 30.0, 0.0], [45.0, 15.0, 18.0]]
+    },
+    {
+      "id": "six_anchors",
+      "anchors": [[0.0, 0.0, 0.0], [60.0, 0.0, 5.0], [0.0, 60.0, 6.0], [60.0, 60.0, 20.0], [30.0, 30.0, 15.0], [10.0, 45.0, 3.0]],
+      "true_position": [42.0, 18.0, 6.0],
+      "noise": [0.3, -0.2, 0.4, -0.5, 0.1, -0.3],
+      "sigma": 0.3,
+      "field": [60.0, 60.0, 20.0],
+      "probe_points": [[42.0, 18.0, 6.0], [30.0, 30.0, 10.0], [58.0, 2.0, 19.0]]
+    }
+  ]
+}

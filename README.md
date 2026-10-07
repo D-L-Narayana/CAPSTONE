@@ -17,7 +17,16 @@ $$\hat p = \arg\min_{p \in \Omega} f(p), \qquad f(p) = \sum_{j=1}^{M} \big(\lVer
 
 This repository contains a working **Particle Swarm Optimization (PSO) 3D localizer**, its baseline experiment from
 Review 1, closed-form comparison methods (least-squares trilateration, Gauss-Newton), a Monte-Carlo parameter study,
-plots, an interactive browser simulation, and the start of the base-paper algorithm **AMCMPSO** (Alhasan et al., 2023).
+plots, an interactive browser simulation, and a configurable *interpretation* of the base-paper algorithm **AMCMPSO**
+(Alhasan et al., 2023; status in the Roadmap).
+
+Phase 2 adds, on top of the unchanged Phase-1 baseline: stopping rules and a least-squares warm start for every PSO
+variant, ranging-noise models (Gaussian, uniform-percent, log-normal shadowing, NLOS) and a robust Huber fitness,
+geometry diagnostics (non-coplanarity, GDOP, Cramér–Rao bound, flip-ambiguity risk), a multi-node iterative
+auto-localization simulator with coverage metrics, an extended Monte-Carlo registry with a CRLB reference column,
+a `python -m pso3d` command line, and a browser simulator that exposes the same algorithms with shareable links and
+CSV/JSON export. Every number below comes from a command in this repository; see [CHANGELOG.md](CHANGELOG.md) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Problem statement
 
@@ -33,7 +42,7 @@ network resources**.
 | # | Objective | Gap addressed | Where in this repo |
 |---|-----------|---------------|--------------------|
 | 1 | **Formulate** 3D localization as range-error minimisation over Ω with ≥ 4 non-coplanar anchors | weak 3D-native design | [`pso3d/fitness.py`](pso3d/fitness.py), [`pso3d/config.py`](pso3d/config.py) |
-| 2 | **Implement** a PSO 3D localizer in Python/NumPy (baseline) and reproduce the base paper's AMCMPSO | 3D design, accuracy-for-effort | [`pso3d/pso.py`](pso3d/pso.py), [`pso3d/standard_pso.py`](pso3d/standard_pso.py), [`pso3d/amcmpso.py`](pso3d/amcmpso.py) *(in progress)* |
+| 2 | **Implement** a PSO 3D localizer in Python/NumPy (baseline) and reproduce the base paper's AMCMPSO | 3D design, accuracy-for-effort | [`pso3d/pso.py`](pso3d/pso.py), [`pso3d/standard_pso.py`](pso3d/standard_pso.py), [`pso3d/amcmpso.py`](pso3d/amcmpso.py) *(interpretation — see [`docs/amcmpso.md`](docs/amcmpso.md))* |
 | 3 | **Measure** accuracy (error, RMSE) vs. noise, anchors, swarm size, iterations; target sub-metre error in 60 × 60 × 20 m | accuracy-for-effort | [`scripts/run_experiments.py`](scripts/run_experiments.py), [`results/results.md`](results/results.md) |
 | 4 | **Quantify** computational and space complexity (fitness evaluations, run time, swarm memory per node) as the Phase-2 baseline | computational cost, memory | evaluation counters in `RangeErrorFitness`, `PSOResult` |
 
@@ -49,16 +58,25 @@ network resources**.
 pso3d/
   config.py        Scenario (field, anchors, true node, noise) — defaults = slide 16 of the Review-1 deck
   fitness.py       RangeErrorFitness: f(p) with fitness-evaluation and distance-computation counters
+  robust.py        HuberRangeFitness, WeightedRangeFitness (outlier-tolerant / weighted variants)
   pso.py           SimplifiedPSO: v ← 0.7·v + 1.4·r⊙(x_best − x), best-of-iteration only (the Review-1 code)
   standard_pso.py  StandardPSO: pbest/gbest memory (reference PSO)
-  amcmpso.py       AMCMPSO scaffold — IN PROGRESS (see Roadmap)
-  trilateration.py least-squares trilateration + Gauss-Newton refinement (closed-form comparison)
-  experiments.py   Monte-Carlo / parameter sweeps (noise, anchors, swarm size, iterations)
-  plots.py         Matplotlib figures and the convergence GIF
-scripts/           run_baseline.py, run_experiments.py
-results/           baseline.json, sweeps.csv, results.md      figures/   PNG + GIF (generated)
-web/               interactive simulator (index.html, pso.js, app.js) — deployed on Vercel
-tests/             pytest (baseline reproduction, noise-free sanity, clipping)
+  amcmpso.py       AMCMPSO — configurable interpretation of the base-paper idea (docs/amcmpso.md; see Roadmap)
+  stopping.py      Patience, Tolerance, MaxEvaluations, TargetFitness, AnyOf stopping rules
+  trilateration.py least-squares trilateration (optionally weighted), Gauss-Newton / Levenberg-Marquardt, warm start
+  centroid.py      centroid and inverse-distance weighted centroid (range-free first guesses)
+  noise.py         ranging-noise models, measure(), from_spec("gaussian:0.5" | "percent:2" | "nlos:0.2" | "shadowing:4")
+  geometry.py      non-coplanarity, GDOP, Cramér–Rao bound, mirror point / flip-ambiguity risk, CRLB coverage grid
+  network.py       multi-node iterative auto-localization (settled nodes become references), N_NL / E_l / coverage
+  experiments.py   Monte-Carlo method registry and parameter sweeps (legacy numbers protected by tests)
+  plots.py, network_plots.py   Matplotlib figures and the convergence GIF
+  cli.py           python -m pso3d baseline | experiments | network | geometry | version
+scripts/           run_baseline.py, run_experiments.py, run_network.py, check.sh, check_sdist.py
+results/           baseline.json, sweeps.csv, results.md, network.*, extended/, network_r50/     figures/   PNG + GIF (generated)
+web/               interactive simulator (index.html, pso.js, geometry.js, share.js, export.js, app.js) — deployed on Vercel
+tests/             pytest suite incl. Python/JavaScript parity; tests/js (node --test); tests/e2e (browser gate, production CSP)
+docs/              one page per module: stopping_and_warm_start, amcmpso, noise_models, geometry, closed_form, network,
+                   experiments, js_parity, web_simulator
 ```
 
 ## How to run
@@ -66,15 +84,30 @@ tests/             pytest (baseline reproduction, noise-free sanity, clipping)
 ```bash
 git clone https://github.com/D-L-Narayana/CAPSTONE.git && cd CAPSTONE
 python -m venv .venv && source .venv/bin/activate      # optional
-pip install -r requirements.txt
+pip install -e ".[plots,dev]"                          # or: pip install -r requirements.txt
 
-python scripts/run_baseline.py          # reproduces the Review-1 result, writes results/baseline.json + figures
-python scripts/run_experiments.py       # Monte-Carlo study (200 nodes/setting, ~20 s), writes results/results.md
-python -m pytest -q tests               # 3 tests
+python -m pso3d baseline                # reproduces the Review-1 result, writes results/baseline.json + figures
+python -m pso3d experiments             # Monte-Carlo study (200 nodes/setting, ~1 min), writes results/results.md
+python -m pso3d experiments --trials 200 --extended --out results/extended --figures figures/extended   # + AMCMPSO, early stop, warm start, CRLB
+python -m pso3d network                 # multi-node auto-localization (50 nodes, 10 beacons), writes results/network.md
+python -m pso3d geometry                # GDOP / CRLB / non-coplanarity report for the baseline scenario
+python -m pytest -q tests               # 318 tests (incl. the frozen Review-1 gate and the Python/JavaScript parity test)
+node --test tests/js/                   # 75 JavaScript tests (simulator algorithms, share links, exports)
+python scripts/check_sdist.py           # builds the sdist + wheel offline (setuptools >= 77, part of the dev extra / requirements.txt),
+                                        # verifies them and runs the whole suite inside the extracted archive
+bash scripts/check.sh                   # everything above that CI runs
 
 # web simulator (no build step)
 python -m http.server 8000 --directory web   # then open http://localhost:8000
+node tests/e2e/serve.js --port 8000          # same, but with the production security headers from web/vercel.json
+node tests/e2e/web_smoke.js                  # browser gate: every workflow in headless Chromium under the enforced CSP
 ```
+
+The scripts in `scripts/` remain runnable directly (`python scripts/run_baseline.py` etc.); `python -m pso3d <command>`
+forwards its options to them. They ship in the source archive (`pso3d-<version>.tar.gz`, contents defined by `MANIFEST.in`
+and verified by `python scripts/check_sdist.py`) but not in the wheel: from a wheel-only install, `pso3d baseline|experiments|network`
+exit with code 2 and point to a checkout, while `version` and `geometry` work everywhere (see [CONTRIBUTING.md](CONTRIBUTING.md),
+"Source distribution").
 
 ## Baseline experiment (Review 1, slide 16) — reproduced
 
@@ -95,7 +128,9 @@ Output of `python scripts/run_baseline.py` (this run):
 | Least-squares trilateration | (37.13, 11.44, 11.65) | 3.20 | 0 (one (M−1)×3 solve) | – | 15 |
 | Least squares + Gauss-Newton | (37.42, 11.88, 9.36) | 0.96 | 10 GN steps | – | 15 |
 | Standard PSO (pbest/gbest), same budget | (37.42, 11.89, 9.35) | 0.96 | 1 220 | 4 880 | 183 |
-| AMCMPSO scaffold *(in progress)* | (37.42, 11.88, 9.36) | 0.96 | 1 220 | 4 880 | 186 |
+| AMCMPSO *(interpretation of the base paper, not a reproduction)* | (37.42, 11.88, 9.36) | 0.96 | 1 220 | 4 880 | 186 |
+| Simplified PSO + `Tolerance(1e-2, 10, relative=False)` early stop *(Phase 2)* | (37.41, 11.92, 9.13) | 0.76 | 780 | 3 120 | 120 |
+| Standard PSO, warm start from LSQ + Gauss-Newton + `Tolerance(1e-2, 10)` *(Phase 2)* | (37.42, 11.88, 9.36) | 0.96 | 240 | 960 | 183 |
 
 * The estimate **(37.43, 11.90, 9.29) m with error 0.90 m is reproduced exactly** (`tests/test_pso.py`).
   Run time ≈ 1.7 ms on a laptop-class CPU.
@@ -104,7 +139,11 @@ Output of `python scripts/run_baseline.py` (this run):
   iteration 38, i.e. the swarm has essentially stopped improving after ≈ 30 iterations, so early stopping could save
   roughly half of the 1 200 evaluations (the simple patience-based stopper in `SimplifiedPSO` did **not** trigger on
   this run because the per-iteration best keeps improving by tiny amounts — a tolerance-based criterion is needed).
-* Least squares + Gauss-Newton, standard PSO and the AMCMPSO scaffold all converge to the **true minimiser of f**,
+  Phase 2 adds that criterion: the absolute rule `Tolerance(1e-2, 10, relative=False)` from
+  [`pso3d/stopping.py`](pso3d/stopping.py) stops this very run at iteration 39 (780 evaluations, error 0.76 m — see the
+  table above); the relative 1 % rule fires only on the last iteration. The warm-started standard PSO reaches the
+  true minimiser of f in 240 evaluations. Details and all rule semantics: [`docs/stopping_and_warm_start.md`](docs/stopping_and_warm_start.md).
+* Least squares + Gauss-Newton, standard PSO and the AMCMPSO interpretation all converge to the **true minimiser of f**,
   (37.42, 11.88, 9.36) m, whose error is 0.96 m. The simplified PSO's 0.90 m is slightly *better* only because it had
   not fully converged; with this noise the accuracy floor is set by the ranging errors, not by the optimiser.
 
@@ -113,6 +152,12 @@ Output of `python scripts/run_baseline.py` (this run):
 | ![convergence](figures/convergence.png) | ![scenario](figures/scenario_3d.png) |
 
 ![swarm animation](figures/convergence.gif)
+
+Geometry of this scenario ([`python -m pso3d geometry`](docs/geometry.md)): anchor rank 3 (non-coplanar), GDOP 5.29 at the
+true node, Cramér–Rao bound 2.65 m for σ = 0.5 m with a vertical component of 2.54 m against 0.44 m / 0.60 m
+horizontally — the formal version of the Δz remark above. The true node lies only 2.7 m from the anchors'
+least-squares plane, so its mirror image fits the four ranges almost as well (flip-ambiguity risk 0.74); the Review-1
+estimate itself is clearly on the correct side (0.06).
 
 ## Monte-Carlo parameter study
 
@@ -149,6 +194,62 @@ What the study shows (and what it does not):
 * Least squares + Gauss-Newton is the strongest and cheapest single-node estimator here (≈ 8 residual evaluations,
   15 floats) and is therefore the natural **warm start** for PSO in Phase 2.
 
+### Phase-2 extension: more methods and the Cramér–Rao reference
+
+`python -m pso3d experiments --trials 200 --extended --out results/extended --figures figures/extended` runs the same
+200 random nodes per setting with four more methods and adds a **CRLB** column: the mean Cramér–Rao lower bound on the
+RMSE of any unbiased estimator for the sampled node positions and σ = 0.5 m ([`pso3d/geometry.py`](pso3d/geometry.py),
+[`docs/geometry.md`](docs/geometry.md)). No method can beat the bound; the gap above it is what better optimisation can
+still recover, the rest is anchor geometry. Full tables: [`results/extended/results.md`](results/extended/results.md);
+method keys, the frozen RNG order and the CLI: [`docs/experiments.md`](docs/experiments.md).
+
+| σ = 0.5 m, 4 anchors, N = 20, T = 60 | RMSE (m) | median (m) | p90 (m) | CRLB (m) | fitness evals | iterations | memory (floats) |
+|---|---|---|---|---|---|---|---|
+| Simplified PSO | 8.38 | 4.66 | 14.65 | 2.51 | 1 200 | 60 | 120 |
+| Standard PSO | 6.53 | 1.67 | 12.93 | 2.51 | 1 220 | 60 | 183 |
+| Least-squares trilateration | 5.86 | 4.48 | 9.85 | 2.44 | 0 | – | 15 |
+| LSQ + Gauss-Newton | 4.17 | 1.48 | 6.53 | 2.44 | 8 | 8.3 | 15 |
+| AMCMPSO *(interpretation)* | 5.47 | 1.55 | 8.41 | 2.51 | 1 220 | 60 | 186 |
+| Standard PSO + `Tolerance(1e-2, 10)` stop | 6.74 | 1.76 | 13.42 | 2.51 | 781 | 38.1 | 183 |
+| Standard PSO + LSQ/GN warm start | **3.19** | **1.32** | **4.66** | 2.51 | 1 220 | 60 | 183 |
+| AMCMPSO *(interpretation)* + warm start | **3.19** | **1.32** | **4.66** | 2.51 | 1 220 | 60 | 186 |
+
+![method bars](figures/extended/method_bars.png)
+
+* The **warm start removes most of the heavy tail**: seeding particle 0 with the closed-form estimate brings the
+  swarm's p90 from 12.9 m to 4.7 m with the same four corner anchors and the same budget — the plateau and flip
+  failures of the cold swarm were optimiser problems. The remaining gap to the bound (3.19 m vs 2.51 m) is geometry.
+* The tolerance stop saves 36 % of the evaluations (781 vs 1 220) at essentially unchanged accuracy.
+* The AMCMPSO interpretation sits between the standard swarm and the warm-started swarm; its numbers describe this
+  repository's implementation on this scenario only (see the Roadmap).
+* The CRLB column differs slightly between the swarm rows (2.51 m) and the closed-form rows (2.44 m) because the
+  swarm methods draw one extra per-trial seed, so their 200 node positions are a different sample.
+
+## Multi-node auto-localization (Phase 2)
+
+`python -m pso3d network` ([`pso3d/network.py`](pso3d/network.py), [`docs/network.md`](docs/network.md)) deploys
+N unknown nodes and M beacons uniformly in a 100 × 100 × 30 m field and runs the iterative scheme of Kulkarni et al.
+(2009, Section IV) in 3D: every round, each node that hears at least four non-coplanar references (beacons or
+already-localized nodes, at most the six nearest) localizes itself with the chosen single-node estimator; localized nodes
+advertise their *estimates* and serve as references in the next round. Metrics follow the paper: N_NL (nodes not
+localized), E_l (mean squared error over localized nodes), plus RMSE and coverage.
+
+| Run (standard PSO 20 × 60, Gaussian σ = 0.5 m, seed 1) | Rounds | Coverage | N_NL | E_l (m²) | RMSE (m) | Fitness evals |
+|---|---|---|---|---|---|---|
+| 50 nodes, 10 beacons, radio range 25 m (defaults) → [`results/network.md`](results/network.md) | 3 | 4 % | 48 | 1.24 | 1.11 | 2 440 |
+| 50 nodes, 10 beacons, radio range 50 m (`--range 50`) → [`results/network_r50/network.md`](results/network_r50/network.md) | 2 | 100 % | 0 | 32.9 | 5.74 | 61 000 |
+
+* With the paper's radio range of 25 m a 3D node rarely hears four beacons at once (0.9 on average with 6 beacons,
+  1.3 with 10), so almost nothing settles — connectivity, not the optimiser, limits coverage; doubling the range
+  localizes every node in two rounds.
+* Errors propagate through settled references: the 13 nodes of round 2 inherit the errors of the 37 round-1 estimates
+  they use as anchors, which is why the RMSE of the fully-covered run (5.7 m) is far above the single-node figures.
+  Nothing re-estimates a settled node later; this is the honest starting point for Phase-2 work on reference quality.
+
+| Rounds (r = 50 m) | Map (r = 50 m) |
+|---|---|
+| ![network rounds](figures/network_r50/network_rounds.png) | ![network map](figures/network_r50/network_map.png) |
+
 ## Interactive web simulation
 
 [`web/`](web/) is a static page (Plotly.js, no build step) deployed on Vercel: **https://capstone-pso3d.vercel.app**
@@ -160,18 +261,34 @@ What the study shows (and what it does not):
   log-scale convergence chart.
 * The JS port uses a seeded mulberry32 generator, so runs are repeatable but do not reproduce the NumPy
   `default_rng(1)` numbers bit-for-bit.
+* New in Phase 2 ([`docs/web_simulator.md`](docs/web_simulator.md)): the AMCMPSO variant (interpretation), stopping
+  rules (patience / tolerance / evaluation budget), warm start from least squares + Gauss-Newton, noise models (fixed,
+  Gaussian, uniform %, NLOS), KPIs for GDOP, the CRLB bound, anchor geometry and flip-ambiguity risk, inline validation
+  instead of `alert()`, labelled controls and live regions, keyboard shortcuts (Space, →, R), shareable links (`#s=…`),
+  CSV / JSON export, an offline notice when Plotly cannot be loaded, and a dark colour scheme.
+* The closed-form solvers, fitness, geometry diagnostics and the AMCMPSO coefficient schedule are the same code path in
+  both languages up to rounding: [`tests/test_parity.py`](tests/test_parity.py) compares the Python package with
+  `web/pso.js` / `web/geometry.js` on shared fixtures ([`docs/js_parity.md`](docs/js_parity.md)).
+* [`web/vercel.json`](web/vercel.json) sends an enforced Content-Security-Policy (scripts only from the page and
+  cdn.plot.ly) and other security headers; `node tests/e2e/web_smoke.js` exercises every workflow above in headless
+  Chromium with those headers enforced ([`tests/e2e/README.md`](tests/e2e/README.md)).
 
 ## Roadmap
 
 - [x] Formulation, baseline simplified PSO, evaluation and memory counters (Objectives 1, 4)
 - [x] Least-squares / Gauss-Newton comparison, Monte-Carlo parameter study, plots (Objective 3)
 - [x] Interactive 3D web simulation on Vercel
-- [ ] **AMCMPSO** ([`pso3d/amcmpso.py`](pso3d/amcmpso.py)) — *in progress*: the class runs (adaptive w/c1/c2, swarm-mean
-      and centre-of-mass guidance) but the exact update equations and constants still have to be transcribed from
-      Section 3 of Alhasan et al. (2023) and validated against the paper's reported numbers (improvement rate 99.86 %,
-      error < 1.34 cm, 3D coverage > 87 %). Its current output must not be quoted as a reproduction of the paper.
-- [ ] Multi-node auto-localization (localized nodes become anchors), coverage metric, NLOS noise model
-- [ ] Phase 2: early stopping with tolerance, least-squares warm start, compact / reduced-state swarms, energy model
+- [x] Early stopping with tolerance, least-squares warm start, noise models (Gaussian, uniform %, shadowing, NLOS),
+      geometry diagnostics (GDOP, CRLB, flip ambiguity), robust Huber fitness
+- [x] Multi-node auto-localization (localized nodes become anchors) with coverage metric
+- [ ] **AMCMPSO** ([`pso3d/amcmpso.py`](pso3d/amcmpso.py), [`docs/amcmpso.md`](docs/amcmpso.md)) — a configurable
+      *interpretation* is implemented and tested (adaptive w/c1/c2 with linear or cosine schedules, swarm-mean and
+      centre-of-mass guidance, stopping rules, warm start, diagnostics), but the exact update equations and constants
+      still have to be transcribed from Section 3 of Alhasan et al. (2023) and validated against the paper's reported
+      numbers (improvement rate 99.86 %, error < 1.34 cm, 3D coverage > 87 %). Its current output must not be quoted as
+      a reproduction of the paper.
+- [ ] Phase 2 (remaining): reference-quality weighting in the network scheme, compact / reduced-state swarms, energy
+      model, comparison against the paper's network sizes
 
 ## Team and guide
 

@@ -3,3 +3,11 @@ __pycache__/
 .venv/
 .pytest_cache/
 .DS_Store
+build/
+dist/
+*.egg-info/
+node_modules/
+.ruff_cache/
+.coverage
+test-results/
+playwright-report/

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>PSO 3D Localization Simulator — Efficient Localization in WSN (3D)</title>
 <meta name="description" content="Interactive particle-swarm 3D node localization for wireless sensor networks: change anchors, noise, swarm size and watch the swarm converge.">
 <link rel="stylesheet" href="style.css">
@@ -26,22 +27,37 @@
       <label>Field Y (m)<input id="fy" type="number" value="60" min="5" step="1"></label>
       <label>Field Z (m)<input id="fz" type="number" value="20" min="1" step="1"></label>
     </div>
-    <h3>Anchors a<sub>j</sub> and ranging noise n<sub>j</sub> (m)</h3>
-    <table id="anchors" class="anchors">
-      <thead><tr><th>#</th><th>x</th><th>y</th><th>z</th><th>n<sub>j</sub></th><th></th></tr></thead>
+    <h3 id="anchorsHeading">Anchors a<sub>j</sub> and per-anchor ranging offsets n<sub>j</sub> (m)</h3>
+    <table id="anchors" class="anchors" aria-labelledby="anchorsHeading">
+      <thead><tr><th scope="col">#</th><th scope="col">x</th><th scope="col">y</th><th scope="col">z</th><th scope="col">n<sub>j</sub></th><th scope="col"><span class="sr-only">remove</span></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row2">
-      <button id="addAnchor" class="btn small">+ anchor</button>
-      <label class="inline"><input id="gauss" type="checkbox"> Gaussian noise σ <input id="sigma" type="number" value="0.5" step="0.1" min="0" style="width:4.5em"></label>
+      <button id="addAnchor" type="button" class="btn small">+ anchor</button>
+      <label>Noise model
+        <select id="noiseModel">
+          <option value="fixed">fixed per-anchor n_j</option>
+          <option value="gaussian">Gaussian σ</option>
+          <option value="uniformPercent">uniform ± % of range</option>
+          <option value="nlos">NLOS (Gaussian + positive bias)</option>
+        </select>
+      </label>
     </div>
+    <div class="row3">
+      <label id="sigmaWrap" hidden>σ (m)<input id="sigma" type="number" value="0.5" step="0.1" min="0"></label>
+      <label id="pnWrap" hidden>P<sub>n</sub> (% of range)<input id="pn" type="number" value="2" step="0.5" min="0"></label>
+      <label id="nlosPWrap" hidden>NLOS probability<input id="nlosP" type="number" value="0.2" step="0.05" min="0" max="1"></label>
+      <label id="nlosBiasWrap" hidden>bias mean (m)<input id="nlosBias" type="number" value="2.0" step="0.1" min="0"></label>
+      <label id="nlosSigmaWrap" hidden>bias σ (m)<input id="nlosSigma" type="number" value="1.0" step="0.1" min="0"></label>
+    </div>
+    <p class="note" id="noiseHint"></p>
     <h3>True node p</h3>
     <div class="row3">
       <label>x<input id="px" type="number" value="37" step="0.1"></label>
       <label>y<input id="py" type="number" value="12" step="0.1"></label>
       <label>z<input id="pz" type="number" value="8.5" step="0.1"></label>
     </div>
-    <button id="randomNode" class="btn small">random node</button>
+    <button id="randomNode" type="button" class="btn small">random node (seeded)</button>
 
     <h2>Swarm</h2>
     <div class="row2">
@@ -49,10 +65,18 @@
         <select id="variant">
           <option value="simplified">Simplified PSO (best of iteration)</option>
           <option value="standard">Standard PSO (pbest / gbest)</option>
+          <option value="amcmpso">AMCMPSO (interpretation of the base paper)</option>
         </select>
       </label>
       <label>Seed<input id="seed" type="number" value="1" step="1"></label>
     </div>
+    <label id="amcmpsoWrap" hidden>AMCMPSO coefficient schedule
+      <select id="amcSchedule">
+        <option value="linear">linear</option>
+        <option value="cosine">cosine</option>
+      </select>
+    </label>
+    <p class="note" id="variantHint"></p>
     <div class="row3">
       <label>Particles N<input id="np" type="number" value="20" min="2" max="500" step="1"></label>
       <label>Iterations T<input id="nt" type="number" value="60" min="1" max="1000" step="1"></label>
@@ -63,21 +87,51 @@
       <label>c2 social<input id="c" type="number" value="1.4" step="0.1"></label>
       <label>c1 cognitive (std.)<input id="c1" type="number" value="1.4" step="0.1"></label>
     </div>
-    <label class="inline"><input id="clip" type="checkbox"> clip particles to the field</label>
-    <div class="controls">
-      <button id="reset" class="btn">Reset</button>
-      <button id="step" class="btn">Step</button>
-      <button id="play" class="btn primary">Play</button>
-      <button id="finish" class="btn">Run to end</button>
+    <div class="row2">
+      <label>Stopping
+        <select id="stopType">
+          <option value="none">none (run all T iterations)</option>
+          <option value="patience">patience (no improvement)</option>
+          <option value="tolerance">tolerance (relative, over a window)</option>
+          <option value="budget">evaluation budget</option>
+        </select>
+      </label>
+      <label id="stopPatienceWrap" hidden>patience (iterations)<input id="stopPatience" type="number" value="10" min="1" step="1"></label>
+      <label id="stopBudgetWrap" hidden>budget (fitness evaluations)<input id="stopBudget" type="number" value="600" min="1" step="10"></label>
     </div>
+    <div class="row2" id="stopToleranceWrap" hidden>
+      <label>relative tolerance<input id="stopTol" type="number" value="0.01" min="0" step="0.001"></label>
+      <label>window (iterations)<input id="stopWindow" type="number" value="10" min="1" step="1"></label>
+    </div>
+    <label class="inline"><input id="clip" type="checkbox"> clip particles to the field</label>
+    <label class="inline"><input id="warm" type="checkbox"> warm start from LSQ + Gauss-Newton (x<sub>0</sub>)</label>
+    <div class="controls">
+      <button id="reset" type="button" class="btn">Reset</button>
+      <button id="step" type="button" class="btn">Step</button>
+      <button id="play" type="button" class="btn primary" aria-pressed="false">Play</button>
+      <button id="finish" type="button" class="btn">Run to end</button>
+    </div>
+    <p class="note" id="kbdHelp">Keyboard: <kbd>Space</kbd> play / pause · <kbd>→</kbd> step · <kbd>R</kbd> reset (ignored while a field has focus).</p>
+
+    <h2>Share &amp; export</h2>
+    <div class="controls three">
+      <button id="share" type="button" class="btn">Copy link</button>
+      <button id="exportCsv" type="button" class="btn">Export CSV</button>
+      <button id="exportJson" type="button" class="btn">Export JSON</button>
+    </div>
+    <label id="shareUrlWrap" hidden>Shareable link (select and copy)<input id="shareUrl" type="text" readonly></label>
+    <p class="note" id="shareStatus" aria-live="polite"></p>
     <p class="note">Random numbers come from a seeded JavaScript generator (mulberry32), so a run here is repeatable
       but does not reproduce the NumPy <code>default_rng(1)</code> numbers of the Python baseline bit-for-bit.</p>
   </aside>
 
   <section class="viz">
-    <div id="plot3d" class="plot"></div>
-    <div class="stats" id="stats"></div>
-    <div id="plotConv" class="plot small"></div>
+    <div id="alerts" class="alerts" role="alert" aria-live="assertive"></div>
+    <div id="plotFallback" class="alert info" hidden>Plotly could not be loaded (offline or blocked); KPIs still update.</div>
+    <div id="plot3d" class="plot" role="figure" aria-label="3D view: anchors, particles, true node and estimate"></div>
+    <p id="runStatus" class="runstatus"></p>
+    <div class="stats" id="stats" aria-live="polite"></div>
+    <div id="plotConv" class="plot small" role="figure" aria-label="Best fitness per iteration"></div>
   </section>
 </main>
 
@@ -86,6 +140,9 @@
   Base paper: Alhasan et al., 2023, <a href="https://doi.org/10.1016/j.jksuci.2023.101782" target="_blank" rel="noopener">doi:10.1016/j.jksuci.2023.101782</a>.</p>
 </footer>
 <script src="pso.js"></script>
+<script src="geometry.js"></script>
+<script src="share.js"></script>
+<script src="export.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

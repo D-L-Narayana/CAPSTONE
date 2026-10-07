@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pso3d"
+dynamic = ["version"]
+description = "PSO-based 3D node localization for wireless sensor networks: simplified/standard PSO, AMCMPSO (interpretation), closed-form trilateration, geometry diagnostics and a multi-node simulator"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+keywords = ["wireless-sensor-networks", "localization", "particle-swarm-optimization", "trilateration", "3d"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.7", "pillow>=9.0"]
+# setuptools: same floor as [build-system] so tests/test_sdist.py and scripts/check_sdist.py can build the archives
+# in the test interpreter (an editable install only uses setuptools inside pip's isolated build environment)
+dev = ["pytest>=7.0", "setuptools>=77"]
+
+[project.scripts]
+pso3d = "pso3d.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/D-L-Narayana/CAPSTONE"
+Simulator = "https://capstone-pso3d.vercel.app"
+
+[tool.setuptools.dynamic]
+version = {attr = "pso3d.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pso3d*"]
+exclude = ["web*", "tests*", "scripts*", "docs*", "results*", "figures*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# fnmatch patterns against directory basenames: skip the Node (tests/js), browser (tests/e2e) and artefact dirs
+norecursedirs = ["e2e", "js", "build", "node_modules", ".git"]
